@@ -1,0 +1,11 @@
+# SQLite DB 파일
+*.db
+
+# VS Code 설정
+.vscode/
+
+# Node.js 의존성 (Day 2부터 생김)
+node_modules/
+
+# 환경변수 파일
+.env

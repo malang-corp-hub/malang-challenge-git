@@ -40,15 +40,3 @@ INSERT INTO users (id, naver_id, name)
 VALUES ('u1', 'naver123', '홍길동');
 
 SELECT * FROM users;
-
-
-이건 실제 DB를 실행할 때 참고할 **예시 코드**예요.  
-GitHub에 올라간 README에는 그대로 두면 됩니다.  
-→ 그러면 저장소를 보는 사람이 “아, 이렇게 하면 테이블 확인 / 샘플 데이터 넣기 할 수 있구나” 하고 따라할 수 있어요.  
-
----
-
-# ✅ 정리
-- README = 문서/안내서  
-- 예시 SQL (`.tables`, `INSERT ...`) = 문서 안에 넣어두면 학습·협업에 도움  
-- **DB에 반영하려면 따로 실행해야 함** (README에만 있다고 자동 적용되지 않음)
