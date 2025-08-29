@@ -56,17 +56,23 @@ BEGIN
 END;
 
 -- 1) 사용자별-챌린지별 제출 상한 (challenge_rules.max_submissions_per_user)
-CREATE TRIGGER IF NOT EXISTS trg_limit_submissions_per_user
+CREATE TRIGGER trg_limit_submissions_max10
 BEFORE INSERT ON submissions
 FOR EACH ROW
 BEGIN
-  SELECT RAISE(ABORT, 'submission limit reached for this user in this challenge')
+  SELECT RAISE(ABORT, 'submission limit reached (max 10)')
   WHERE (
     SELECT COUNT(1)
     FROM submissions s
     WHERE s.challenge_id = NEW.challenge_id
       AND s.user_id = NEW.user_id
-  ) >= COALESCE((SELECT max_submissions_per_user FROM challenge_rules WHERE challenge_id = NEW.challenge_id), 1);
+      AND s.status IN ('active', 'hidden')
+  ) >= MIN(
+    COALESCE((SELECT max_submissions_per_user 
+              FROM challenge_rules
+              WHERE challenge_id = NEW.challenge_id), 1),
+    10
+  );
 END;
 
 -- 2) 제출 후 편집 가능 시간 제한 (allow_edit_until_minutes)
