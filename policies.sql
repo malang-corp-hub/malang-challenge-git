@@ -75,21 +75,44 @@ BEGIN
   );
 END;
 
--- 2) 제출 후 편집 가능 시간 제한 (allow_edit_until_minutes)
+-- 2) 수정(Edit) 24시간 제한 (모든 사용자 동일)
+--   - 최초 등록 후 24시간 이내에만 이미지/링크/캡션 수정 허용
 CREATE TRIGGER IF NOT EXISTS trg_edit_window_submissions
 BEFORE UPDATE OF image_url, youtube_url, instagram_url, caption ON submissions
 FOR EACH ROW
 BEGIN
-  SELECT RAISE(ABORT, 'edit window closed for this submission')
-  WHERE NOT EXISTS (
-    SELECT 1
-    FROM challenge_rules cr
-    WHERE cr.challenge_id = NEW.challenge_id
-      AND datetime('now') <= datetime(OLD.created_at, '+' || COALESCE(cr.allow_edit_until_minutes,0) || ' minutes')
-  );
+  SELECT RAISE(ABORT, 'edit window closed (24h)')
+  WHERE datetime('Now') > datetime(OLD.created_at, '+24 hours');
 END;
 
--- 3) 미디어 타입 정책 (challenge_rules.allow_media_types)
+-- 3) 삽입 직후 노출 강제 제어
+--   - 일반 사용자(author가 admin이 아님) & 등록 시점으로부터 1시간 이전이면 무조건 hidden으로 고정
+--   - admin이 작성한 게시물은 예외(즉시 active 허용)
+CREATE TRIGGER trg_visibility_gate_after_insert
+AFTER INSERT ON submissions
+FOR EACH ROW
+BEGIN
+  UPDATE submissions
+  SET status = 'hidden'
+  WHERE id = NEW.id
+    AND (SELECT role FROM users WHERE id = NEW.user_id) <> 'admin'
+    AND datetime('Now') < datetime(COALESCE(NEW.created_at, CURRENT_TIMESTAMP), '+1 hours');
+END;
+
+-- 4) 노출(visible=active) 전환 제한
+--   - 일반 사용자의 게시물을 active로 바꾸려면 생성 후 1시간이 지나야 함
+--   - admin이 작성한 게시물은 1시간 내에도 active 허용
+CREATE TRIGGER trg_visibility_activate_24h
+BEFORE UPDATE OF status ON submission
+FOR EACH ROW
+BEGIN
+  SELECT RAISE(ABORT, 'cannot activate before 1h (author is not admin)')
+  WHERE NEW.status = 'active'
+    AND (SELECT role FROM users WHERE id = OLD.user_id) <> 'admin'
+    AND datetime('Now') < datetime(OLD.created_at, '+1 hours')
+END;
+
+-- 5) 미디어 타입 정책 (challenge_rules.allow_media_types)
 -- 허용 타입 이외의 필드 사용 방지
 CREATE TRIGGER IF NOT EXISTS trg_media_types_on_insert
 BEFORE INSERT ON submissions
@@ -128,7 +151,7 @@ BEGIN
         (SELECT INSTR(LOWER(allow_media_types), 'youtube') = 0 FROM challenge_rules WHERE challenge_id = NEW.challenge_id);
 END;
 
--- 4) 자기 게시물 좋아요 금지 (선택 정책)
+-- 6) 자기 게시물 좋아요 금지 (선택 정책)
 CREATE TRIGGER IF NOT EXISTS trg_no_self_like
 BEFORE INSERT ON likes
 FOR EACH ROW
@@ -140,7 +163,7 @@ BEGIN
   );
 END;
 
--- 5) 챌린지 기간 내 제출만 허용
+-- 7) 챌린지 기간 내 제출만 허용
 CREATE TRIGGER IF NOT EXISTS trg_submission_within_challenge_window
 BEFORE INSERT ON submissions
 FOR EACH ROW
@@ -153,7 +176,7 @@ BEGIN
   );
 END;
 
--- 6) 댓글/좋아요는 active 상태의 게시물에만 허용
+-- 8) 댓글/좋아요는 active 상태의 게시물에만 허용
 CREATE TRIGGER IF NOT EXISTS trg_like_only_active_submission
 BEFORE INSERT ON likes
 FOR EACH ROW
