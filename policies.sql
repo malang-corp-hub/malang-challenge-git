@@ -102,14 +102,14 @@ END;
 -- 4) 노출(visible=active) 전환 제한
 --   - 일반 사용자의 게시물을 active로 바꾸려면 생성 후 1시간이 지나야 함
 --   - admin이 작성한 게시물은 1시간 내에도 active 허용
-CREATE TRIGGER trg_visibility_activate_24h
+CREATE TRIGGER trg_visibility_activate_1h
 BEFORE UPDATE OF status ON submissions
 FOR EACH ROW
 BEGIN
   SELECT RAISE(ABORT, 'cannot activate before 1h (author is not admin)')
   WHERE NEW.status = 'active'
     AND (SELECT role FROM users WHERE id = OLD.user_id) <> 'admin'
-    AND datetime('Now') < datetime(OLD.created_at, '+1 hours');
+    AND datetime('now') < datetime(OLD.created_at, '+1 hours');
 END;
 
 -- 5) 미디어 타입 정책 (challenge_rules.allow_media_types)
