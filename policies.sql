@@ -103,13 +103,13 @@ END;
 --   - 일반 사용자의 게시물을 active로 바꾸려면 생성 후 1시간이 지나야 함
 --   - admin이 작성한 게시물은 1시간 내에도 active 허용
 CREATE TRIGGER trg_visibility_activate_24h
-BEFORE UPDATE OF status ON submission
+BEFORE UPDATE OF status ON submissions
 FOR EACH ROW
 BEGIN
   SELECT RAISE(ABORT, 'cannot activate before 1h (author is not admin)')
   WHERE NEW.status = 'active'
     AND (SELECT role FROM users WHERE id = OLD.user_id) <> 'admin'
-    AND datetime('Now') < datetime(OLD.created_at, '+1 hours')
+    AND datetime('Now') < datetime(OLD.created_at, '+1 hours');
 END;
 
 -- 5) 미디어 타입 정책 (challenge_rules.allow_media_types)
@@ -118,40 +118,24 @@ CREATE TRIGGER IF NOT EXISTS trg_media_types_on_insert
 BEFORE INSERT ON submissions
 FOR EACH ROW
 BEGIN
-  -- 이미지가 허용되지 않으면 image_url 사용 금지
-  SELECT RAISE(ABORT, 'image_url not allowed by challenge rules')
-  WHERE NEW.image_url IS NOT NULL AND
-        (SELECT INSTR(LOWER(allow_media_types), 'image') = 0 FROM challenge_rules WHERE challenge_id = NEW.challenge_id);
-
-  -- 인스타그램이 허용되지 않으면 instagram_url 금지
-  SELECT RAISE(ABORT, 'instagram_url not allowed by challenge rules')
-  WHERE NEW.instagram_url IS NOT NULL AND
-        (SELECT INSTR(LOWER(allow_media_types), 'instagram') = 0 FROM challenge_rules WHERE challenge_id = NEW.challenge_id);
-
-  -- 유튜브가 허용되지 않으면 youtube_url 금지
-  SELECT RAISE(ABORT, 'youtube_url not allowed by challenge rules')
-  WHERE NEW.youtube_url IS NOT NULL AND
-        (SELECT INSTR(LOWER(allow_media_types), 'youtube') = 0 FROM challenge_rules WHERE challenge_id = NEW.challenge_id);
+  --image url 비어있으면 거부
+  SELECT RAISE(ABORT, 'image_url is required')
+  WHERE COALESCE(NEW.image_url, '') = '';
 END;
 
-CREATE TRIGGER IF NOT EXISTS trg_media_types_on_update
-BEFORE UPDATE OF image_url, instagram_url, youtube_url ON submissions
+-- 6) UPDATE 시: image_url 을 비우는 변경 금지
+CREATE TRIGGER trg_submission_require_image_update
+BEFORE UPDATE OF image_url ON submissions
 FOR EACH ROW
 BEGIN
-  SELECT RAISE(ABORT, 'image_url not allowed by challenge rules')
-  WHERE NEW.image_url IS NOT NULL AND
-        (SELECT INSTR(LOWER(allow_media_types), 'image') = 0 FROM challenge_rules WHERE challenge_id = NEW.challenge_id);
-
-  SELECT RAISE(ABORT, 'instagram_url not allowed by challenge rules')
-  WHERE NEW.instagram_url IS NOT NULL AND
-        (SELECT INSTR(LOWER(allow_media_types), 'instagram') = 0 FROM challenge_rules WHERE challenge_id = NEW.challenge_id);
-
-  SELECT RAISE(ABORT, 'youtube_url not allowed by challenge rules')
-  WHERE NEW.youtube_url IS NOT NULL AND
-        (SELECT INSTR(LOWER(allow_media_types), 'youtube') = 0 FROM challenge_rules WHERE challenge_id = NEW.challenge_id);
+  -- 기존엔 이미지가 있었는데, 업데이트 후에 이미지가 비어있으면 거부
+  SELECT RAISE(ABORT, 'image_url cannot be removed')
+  WHERE COALESCE(NEW.image_url, '') = '';
 END;
+-- ※ 인스타그램/유튜브 URL은 “값이 있으면 저장, 없어도 통과”.
+--    별도 타입 허용 검사는 제거 → 정책 단순화(항상 이미지 필수만 강제)
 
--- 6) 자기 게시물 좋아요 금지 (선택 정책)
+-- 7) 자기 게시물 좋아요 금지
 CREATE TRIGGER IF NOT EXISTS trg_no_self_like
 BEFORE INSERT ON likes
 FOR EACH ROW
@@ -163,7 +147,7 @@ BEGIN
   );
 END;
 
--- 7) 챌린지 기간 내 제출만 허용
+-- 8) 챌린지 기간 내 제출만 허용
 CREATE TRIGGER IF NOT EXISTS trg_submission_within_challenge_window
 BEFORE INSERT ON submissions
 FOR EACH ROW
@@ -176,7 +160,7 @@ BEGIN
   );
 END;
 
--- 8) 댓글/좋아요는 active 상태의 게시물에만 허용
+-- 9) 댓글/좋아요는 active 상태의 게시물에만 허용
 CREATE TRIGGER IF NOT EXISTS trg_like_only_active_submission
 BEFORE INSERT ON likes
 FOR EACH ROW
