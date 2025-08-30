@@ -77,12 +77,12 @@ END;
 
 -- 2) 수정(Edit) 24시간 제한 (모든 사용자 동일)
 --   - 최초 등록 후 24시간 이내에만 이미지/링크/캡션 수정 허용
-CREATE TRIGGER IF NOT EXISTS trg_edit_window_submissions
+CREATE TRIGGER trg_edit_window_submissions
 BEFORE UPDATE OF image_url, youtube_url, instagram_url, caption ON submissions
 FOR EACH ROW
 BEGIN
   SELECT RAISE(ABORT, 'edit window closed (24h)')
-  WHERE datetime('Now') > datetime(OLD.created_at, '+24 hours');
+  WHERE datetime('now') > datetime(OLD.created_at, '+24 hours');
 END;
 
 -- 3) 삽입 직후 노출 강제 제어

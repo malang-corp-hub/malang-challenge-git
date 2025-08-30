@@ -27,7 +27,6 @@ CREATE TABLE challenge_rules (
   id TEXT PRIMARY KEY,
   challenge_id TEXT NOT NULL REFERENCES challenges(id) ON DELETE CASCADE,
   max_submissions_per_user INTEGER DEFAULT 1,
-  allow_edit_until_minutes INTEGER DEFAULT 10,
   allow_media_types TEXT DEFAULT 'image',
   required_aspect_ratio TEXT DEFAULT '1:1,4:5,1.91:1',
   min_resolution_px INTEGER,
